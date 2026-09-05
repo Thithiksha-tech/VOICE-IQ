@@ -1,0 +1,6 @@
+{
+  "name": "VoiceIQ",
+  "description": "AI-Powered Voice Communication Practice & Speech Analysis with Student and Admin Dashboards",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
