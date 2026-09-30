@@ -30,6 +30,7 @@ class AudioTranscriptionService:
             try:
                 from google import genai
                 from google.genai import types
+                from services.gemini_client import generate_with_fallback
 
                 client = genai.Client(api_key=self.gemini_key)
                 
@@ -47,8 +48,8 @@ class AudioTranscriptionService:
                 elif audio_file_path.endswith(".webm"):
                     mime_type = "audio/webm"
 
-                response = client.models.generate_content(
-                    model="gemini-3.5-transcribe",
+                response = generate_with_fallback(
+                    client,
                     contents=[
                         types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
                         "Accurately transcribe all words spoken in this audio. Do not summarize or add commentary. Return only the spoken transcript. If there is no audible speech, return EMPTY_AUDIO."

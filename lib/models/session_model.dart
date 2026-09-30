@@ -1,4 +1,5 @@
 import 'analysis_model.dart';
+import '../utils/date_utils.dart';
 
 class PracticeSessionModel {
   final int id;
@@ -30,7 +31,7 @@ class PracticeSessionModel {
       transcript: json['transcript'],
       overallScore: (json['overall_score'] as num?)?.toDouble(),
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          ? parseServerTime(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
       analysis: json['analysis'] != null ? SpeechAnalysisModel.fromJson(json['analysis']) : null,
     );

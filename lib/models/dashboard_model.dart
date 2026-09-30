@@ -1,4 +1,5 @@
 import 'session_model.dart';
+import '../utils/date_utils.dart';
 
 class StudentDashboardModel {
   final int studentId;
@@ -90,7 +91,7 @@ class AdminActivityModel {
       prompt: json['prompt'] ?? '',
       overallScore: (json['overall_score'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          ? parseServerTime(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
     );
   }

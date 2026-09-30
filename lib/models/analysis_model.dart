@@ -1,3 +1,5 @@
+import '../utils/date_utils.dart';
+
 class SpeechAnalysisModel {
   final int id;
   final int practiceSessionId;
@@ -37,7 +39,7 @@ class SpeechAnalysisModel {
       wordsPerMinute: (json['words_per_minute'] as num?)?.toDouble() ?? 0.0,
       fillerWordCount: json['filler_word_count'] ?? 0,
       feedback: json['feedback'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      createdAt: json['created_at'] != null ? parseServerTime(json['created_at']) : null,
     );
   }
 }

@@ -87,10 +87,11 @@ Respond strictly with valid JSON with the following schema:
         if self.gemini_key:
             try:
                 from google import genai
+                from services.gemini_client import generate_with_fallback
                 client = genai.Client(api_key=self.gemini_key)
 
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
+                response = generate_with_fallback(
+                    client,
                     contents=system_prompt,
                     config={
                         "response_mime_type": "application/json"

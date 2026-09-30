@@ -6,3 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Flutter
+.dart_tool/
+.flutter-plugins-dependencies
+
+# Python backend
+.venv/
+__pycache__/
+*.db
+backend/data/

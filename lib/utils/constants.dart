@@ -17,8 +17,11 @@ class AppConstants {
   //
   // 3. FOR WEB OR DESKTOP TESTING:
   //    static const String apiBaseUrl = 'http://127.0.0.1:8000';
+  //
+  // 4. FOR USB-CONNECTED PHONE: run `adb reverse tcp:8000 tcp:8000`, then use
+  //    static const String apiBaseUrl = 'http://127.0.0.1:8000';
   // =========================================================================
-  static const String apiBaseUrl = 'http://10.0.2.2:8000';
+  static const String apiBaseUrl = 'http://127.0.0.1:8000';
 
   // API Endpoints
   static const String registerEndpoint = '$apiBaseUrl/api/auth/register';

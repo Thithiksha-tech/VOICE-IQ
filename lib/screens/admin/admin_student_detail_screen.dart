@@ -67,7 +67,7 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: Text(widget.studentName),
+        title: Text(widget.studentName, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF1E293B),
         foregroundColor: Colors.white,
         elevation: 0,

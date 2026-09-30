@@ -83,9 +83,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             Icon(Icons.shield_outlined, color: Colors.amber, size: 22),
             SizedBox(width: 10),
-            Text(
-              'VoiceIQ Admin Console',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+            Flexible(
+              child: Text(
+                'VoiceIQ Admin Console',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -233,7 +236,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             'Institutional Average Score',
             '${data.averagePerformance.toStringAsFixed(1)} / 100',
             Icons.speed_rounded,
-            data.averagePerformance >= 70 ? Colors.emerald : Colors.amber,
+            data.averagePerformance >= 70 ? Colors.green : Colors.amber,
           ),
           const SizedBox(height: 28),
 
@@ -403,13 +406,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 2),
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.white60)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text(label, style: const TextStyle(fontSize: 12, color: Colors.white60)),
+              ],
+            ),
           ),
         ],
       ),
