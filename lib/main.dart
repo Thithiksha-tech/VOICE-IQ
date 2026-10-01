@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'utils/constants.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +21,18 @@ class VoiceIQApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) {
+          final auth = AuthService();
+          // Expired or invalid login: close open screens and return to sign-in
+          ApiService.onUnauthorized = () {
+            navigatorKey.currentState?.popUntil((route) => route.isFirst);
+            auth.logout();
+          };
+          return auth;
+        }),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'VoiceIQ — Speech & Communication Analysis',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(

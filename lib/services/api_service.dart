@@ -7,7 +7,17 @@ import '../models/session_model.dart';
 import '../models/dashboard_model.dart';
 
 class ApiService {
+  /// Called when the server rejects the saved login (expired or invalid token).
+  static void Function()? onUnauthorized;
+
   final http.Client _client = http.Client();
+
+  void _checkSession(http.Response response) {
+    if (response.statusCode == 401) {
+      onUnauthorized?.call();
+      throw Exception('Your session has expired. Please sign in again.');
+    }
+  }
 
   Map<String, String> _headers(String? token) {
     return {
@@ -120,6 +130,7 @@ class ApiService {
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+      _checkSession(response);
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
@@ -141,6 +152,7 @@ class ApiService {
         headers: _headers(token),
       );
 
+      _checkSession(response);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return StudentDashboardModel.fromJson(data);
@@ -159,6 +171,7 @@ class ApiService {
         headers: _headers(token),
       );
 
+      _checkSession(response);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return (data as List).map((i) => PracticeSessionModel.fromJson(i)).toList();
@@ -177,6 +190,7 @@ class ApiService {
         headers: _headers(token),
       );
 
+      _checkSession(response);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return PracticeSessionModel.fromJson(data);
@@ -197,6 +211,7 @@ class ApiService {
         headers: _headers(token),
       );
 
+      _checkSession(response);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return AdminDashboardModel.fromJson(data);
@@ -215,6 +230,7 @@ class ApiService {
         headers: _headers(token),
       );
 
+      _checkSession(response);
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return (data as List).map((i) => AdminStudentSummaryModel.fromJson(i)).toList();

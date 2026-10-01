@@ -26,7 +26,7 @@ class AppConstants {
   // =========================================================================
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://voiceiq-backend.onrender.com',
+    defaultValue: 'https://voiceiq-backend-tkjn.onrender.com',
   );
 
   // API Endpoints
