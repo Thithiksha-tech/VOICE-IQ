@@ -8,6 +8,9 @@ load_dotenv()
 
 # Database URL defaults to SQLite. For PostgreSQL/Supabase, set DATABASE_URL=postgresql://...
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./voiceiq.db")
+# Hosting providers often hand out postgres://, which SQLAlchemy 2 no longer accepts
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # SQLite needs check_same_thread=False for multi-threaded FastAPI requests
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
