@@ -30,10 +30,13 @@ class AppConstants {
   );
 
   // API Endpoints
-  static const String registerEndpoint = '$apiBaseUrl/api/auth/register';
   static const String loginEndpoint = '$apiBaseUrl/api/auth/login';
   static const String forgotPasswordEndpoint = '$apiBaseUrl/api/auth/forgot-password';
   static const String resetPasswordEndpoint = '$apiBaseUrl/api/auth/reset-password';
+  static const String meEndpoint = '$apiBaseUrl/api/auth/me';
+  static const String emailSendCodeEndpoint = '$apiBaseUrl/api/auth/email/send-code';
+  static const String emailVerifyEndpoint = '$apiBaseUrl/api/auth/email/verify';
+  static const String setPasswordEndpoint = '$apiBaseUrl/api/auth/set-password';
   static const String analyzeEndpoint = '$apiBaseUrl/api/audio/analyze';
   static const String studentDashboardEndpoint = '$apiBaseUrl/api/history/dashboard/me';
   static const String studentHistoryEndpoint = '$apiBaseUrl/api/history/student';

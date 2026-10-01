@@ -5,9 +5,9 @@ import '../../widgets/custom_button.dart';
 
 /// Two steps: request a 6-digit code by email, then enter it with a new password.
 class ForgotPasswordScreen extends StatefulWidget {
-  final String initialEmail;
+  final String initialUsername;
 
-  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
+  const ForgotPasswordScreen({super.key, this.initialUsername = ''});
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -31,7 +31,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: widget.initialEmail);
+    _emailController = TextEditingController(text: widget.initialUsername);
   }
 
   @override
@@ -133,7 +133,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               Text(
                 _codeSent
                     ? 'Enter the 6-digit code we emailed you and choose a new password.'
-                    : 'Enter your account email and we will send you a 6-digit code.',
+                    : 'Enter your register number. We will email a 6-digit code to the email you verified.',
                 style: const TextStyle(fontSize: 15, color: AppConstants.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 24),
@@ -146,10 +146,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 child: TextFormField(
                   controller: _emailController,
                   enabled: !_codeSent,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _decoration('Email', Icons.email_outlined),
+                  keyboardType: TextInputType.visiblePassword,
+                  autocorrect: false,
+                  decoration: _decoration('Register number', Icons.badge_outlined),
                   validator: (val) =>
-                      val == null || !val.contains('@') ? 'Please enter a valid email' : null,
+                      val == null || val.trim().isEmpty ? 'Please enter your register number' : null,
                 ),
               ),
               const SizedBox(height: 16),

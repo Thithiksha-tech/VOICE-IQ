@@ -40,12 +40,14 @@ class StudentDashboardModel {
 
 class AdminDashboardModel {
   final int totalStudents;
+  final int activatedStudents;
   final int totalPracticeSessions;
   final double averagePerformance;
   final List<AdminActivityModel> recentActivity;
 
   AdminDashboardModel({
     required this.totalStudents,
+    this.activatedStudents = 0,
     required this.totalPracticeSessions,
     required this.averagePerformance,
     required this.recentActivity,
@@ -59,6 +61,7 @@ class AdminDashboardModel {
 
     return AdminDashboardModel(
       totalStudents: json['total_students'] ?? 0,
+      activatedStudents: json['activated_students'] ?? 0,
       totalPracticeSessions: json['total_practice_sessions'] ?? 0,
       averagePerformance: (json['average_performance'] as num?)?.toDouble() ?? 0.0,
       recentActivity: activities,
@@ -100,25 +103,44 @@ class AdminActivityModel {
 class AdminStudentSummaryModel {
   final int id;
   final String name;
-  final String email;
+  final String? registerNumber;
+  final String? email;
+  final bool activated;
   final int sessionsCount;
   final double averageScore;
+  final DateTime? lastPracticeAt;
+  final Map<String, double> skillAverages;
 
   AdminStudentSummaryModel({
     required this.id,
     required this.name,
-    required this.email,
+    this.registerNumber,
+    this.email,
+    required this.activated,
     required this.sessionsCount,
     required this.averageScore,
+    this.lastPracticeAt,
+    this.skillAverages = const {},
   });
 
   factory AdminStudentSummaryModel.fromJson(Map<String, dynamic> json) {
+    final rawSkills = json['skill_averages'] as Map<String, dynamic>? ?? {};
     return AdminStudentSummaryModel(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
-      email: json['email'] ?? '',
+      registerNumber: json['register_number'],
+      email: json['email'],
+      activated: json['activated'] ?? false,
       sessionsCount: json['sessions_count'] ?? 0,
       averageScore: (json['average_score'] as num?)?.toDouble() ?? 0.0,
+      lastPracticeAt: parseServerTime(json['last_practice_at']),
+      skillAverages: rawSkills.map((k, v) => MapEntry(k, (v as num).toDouble())),
     );
+  }
+
+  /// Lowest-scoring skill, or null before the first practice session.
+  MapEntry<String, double>? get weakestSkill {
+    if (sessionsCount == 0 || skillAverages.isEmpty) return null;
+    return skillAverages.entries.reduce((a, b) => a.value <= b.value ? a : b);
   }
 }

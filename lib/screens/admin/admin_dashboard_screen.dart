@@ -23,6 +23,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   String? _error;
   int _selectedTab = 0; // 0 = Overview, 1 = Student Roster
+  String _search = '';
 
   @override
   void initState() {
@@ -227,10 +228,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildAdminMetricCard('Sessions Logged', data.totalPracticeSessions.toString(), Icons.mic_none_outlined, Colors.purpleAccent),
+                child: _buildAdminMetricCard('Activated Accounts', '${data.activatedStudents} / ${data.totalStudents}', Icons.verified_user_outlined, Colors.tealAccent),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _buildAdminMetricCard('Sessions Logged', data.totalPracticeSessions.toString(), Icons.mic_none_outlined, Colors.purpleAccent),
           const SizedBox(height: 12),
           _buildAdminMetricCard(
             'Institutional Average Score',
@@ -328,18 +331,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
     }
 
+    final query = _search.trim().toLowerCase();
+    final visible = query.isEmpty
+        ? _students
+        : _students
+            .where((s) =>
+                s.name.toLowerCase().contains(query) || (s.registerNumber ?? '').toLowerCase().contains(query))
+            .toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: TextField(
+            onChanged: (val) => setState(() => _search = val),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search by name or register number',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              filled: true,
+              fillColor: const Color(0xFF1E293B),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        Expanded(child: _buildStudentList(visible)),
+      ],
+    );
+  }
+
+  Widget _buildStudentList(List<AdminStudentSummaryModel> students) {
+    if (students.isEmpty) {
+      return const Center(child: Text('No students match your search.', style: TextStyle(color: Colors.white60)));
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: _students.length,
+      itemCount: students.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final st = _students[index];
+        final st = students[index];
+        final weakest = st.weakestSkill;
 
         return InkWell(
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => AdminStudentDetailScreen(studentId: st.id, studentName: st.name)),
+              MaterialPageRoute(builder: (_) => AdminStudentDetailScreen(student: st)),
             );
           },
           borderRadius: BorderRadius.circular(12),
@@ -364,17 +403,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        st.name,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              st.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (st.activated ? Colors.tealAccent : Colors.orangeAccent).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              st.activated ? 'Active' : 'Not activated',
+                              style: TextStyle(
+                                color: st.activated ? Colors.tealAccent : Colors.orangeAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2),
-                      Text(st.email, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                      Text(
+                        'Reg. No. ${st.registerNumber ?? '-'}',
+                        style: const TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                        '${st.sessionsCount} Sessions • Avg: ${st.averageScore.toStringAsFixed(1)}%',
-                        style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.w600),
+                        st.sessionsCount == 0
+                            ? 'No practice yet'
+                            : '${st.sessionsCount} Sessions • Avg: ${st.averageScore.toStringAsFixed(1)}%'
+                                '${st.lastPracticeAt != null ? ' • Last: ${DateFormat('MMM d').format(st.lastPracticeAt!)}' : ''}',
+                        style: TextStyle(
+                          color: st.sessionsCount == 0 ? Colors.white38 : Colors.amber,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      if (weakest != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          'Needs work: ${weakest.key[0].toUpperCase()}${weakest.key.substring(1)} (${weakest.value.toStringAsFixed(0)})',
+                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -42,13 +42,14 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String name, String email, String password) async {
+  /// [username] is a register number (students) or an email (admin).
+  Future<bool> login(String username, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final user = await _apiService.register(name, email, password);
+      final user = await _apiService.login(username, password);
       _currentUser = user;
       await _persistSession(user);
       _isLoading = false;
@@ -62,26 +63,15 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
+
+  /// Applies a profile returned by the server (e.g. after email verification), keeping the token.
+  Future<void> applyProfile(Map<String, dynamic> profile) async {
+    final token = _currentUser?.token;
+    if (token == null) return;
+    _currentUser = UserModel.fromJson(profile, token: token);
+    await _persistSession(_currentUser!);
     notifyListeners();
-
-    try {
-      final user = await _apiService.login(email, password);
-      _currentUser = user;
-      await _persistSession(user);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
   }
-
 
   Future<void> _persistSession(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();

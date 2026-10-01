@@ -4,47 +4,64 @@ from pydantic import BaseModel, EmailStr, Field
 
 # --- Auth Schemas ---
 
-class UserRegister(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
-    email: EmailStr
-    password: str = Field(..., min_length=6, max_length=100)
-
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class AdminLogin(BaseModel):
-    email: EmailStr
+    username: str = Field(..., min_length=1, max_length=150)  # register number, or email for the admin
     password: str
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    username: str = Field(..., min_length=1, max_length=150)  # register number or verified email
 
 class ResetPasswordRequest(BaseModel):
-    email: EmailStr
+    username: str = Field(..., min_length=1, max_length=150)
     code: str = Field(..., pattern=r"^\d{6}$")
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+class SendEmailCodeRequest(BaseModel):
+    email: EmailStr
+
+class VerifyEmailRequest(BaseModel):
+    code: str = Field(..., pattern=r"^\d{6}$")
+
+class SetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=100)
 
 class MessageResponse(BaseModel):
     message: str
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    register_number: Optional[str] = None
+    email: Optional[str] = None
+    email_verified: bool = False
+    must_change_password: bool = False
+    role: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: int
     name: str
-    email: str
+    register_number: Optional[str] = None
+    email: Optional[str] = None
+    email_verified: bool = False
+    must_change_password: bool = False
     role: str
 
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: str
-    role: str
-    created_at: datetime
+class StudentImportItem(BaseModel):
+    register_number: str = Field(..., min_length=1, max_length=30)
+    name: str = Field(..., min_length=1, max_length=100)
 
-    class Config:
-        from_attributes = True
+class StudentImportRequest(BaseModel):
+    students: List[StudentImportItem]
+
+class StudentImportResponse(BaseModel):
+    created: int
+    skipped_existing: List[str] = []
 
 # --- Analysis & Session Schemas ---
 
@@ -89,7 +106,7 @@ class AudioAnalyzeResponse(BaseModel):
 class StudentDashboardResponse(BaseModel):
     student_id: int
     student_name: str
-    student_email: str
+    student_email: Optional[str] = None
     overall_performance: float
     practice_sessions_count: int
     recent_score: Optional[float] = None
@@ -105,6 +122,7 @@ class AdminActivityItem(BaseModel):
 
 class AdminDashboardResponse(BaseModel):
     total_students: int
+    activated_students: int = 0
     total_practice_sessions: int
     average_performance: float
     recent_activity: List[AdminActivityItem] = []
@@ -112,10 +130,14 @@ class AdminDashboardResponse(BaseModel):
 class AdminStudentListItem(BaseModel):
     id: int
     name: str
-    email: str
+    register_number: Optional[str] = None
+    email: Optional[str] = None
+    activated: bool  # finished first-login setup (verified email + own password)
     created_at: datetime
     sessions_count: int
     average_score: float
+    last_practice_at: Optional[datetime] = None
+    skill_averages: dict = {}
 
 class AdminStudentDetailResponse(BaseModel):
     student: UserResponse

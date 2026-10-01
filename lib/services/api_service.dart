@@ -29,39 +29,14 @@ class ApiService {
 
   // --- Authentication ---
 
-  Future<UserModel> register(String name, String email, String password) async {
-    try {
-      final response = await _client.post(
-        Uri.parse(AppConstants.registerEndpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': name.trim(),
-          'email': email.trim().toLowerCase(),
-          'password': password,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return UserModel.fromJson(data);
-      } else {
-        throw Exception(data['detail'] ?? 'Registration failed. Please try again.');
-      }
-    } on SocketException {
-      throw Exception('Cannot connect to backend server at ${AppConstants.apiBaseUrl}. Please verify your network connection and server IP.');
-    } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Unexpected error: $e');
-    }
-  }
-
-  Future<UserModel> login(String email, String password) async {
+  /// [username] is a register number (students) or an email (admin).
+  Future<UserModel> login(String username, String password) async {
     try {
       final response = await _client.post(
         Uri.parse(AppConstants.loginEndpoint),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email.trim().toLowerCase(),
+          'username': username.trim(),
           'password': password,
         }),
       );
@@ -70,42 +45,93 @@ class ApiService {
       if (response.statusCode == 200) {
         return UserModel.fromJson(data);
       } else {
-        throw Exception(data['detail'] ?? 'Invalid email or password.');
+        throw Exception(data['detail'] ?? 'Invalid register number or password.');
       }
     } on SocketException {
-      throw Exception('Cannot reach backend server. Please ensure the FastAPI server is running on ${AppConstants.apiBaseUrl}.');
+      throw Exception('Cannot reach the server. Please check your internet connection.');
     }
   }
 
-  /// Emails a 6-digit reset code; returns the server's confirmation message.
-  Future<String> forgotPassword(String email) async {
-    return _postForMessage(
+  /// Emails a 6-digit reset code to the account's verified email.
+  Future<String> forgotPassword(String username) async {
+    final data = await _post(
       AppConstants.forgotPasswordEndpoint,
-      {'email': email.trim().toLowerCase()},
+      {'username': username.trim()},
       'Could not send the reset code. Please try again.',
     );
+    return data['message'] as String;
   }
 
   /// Sets a new password using the emailed code.
-  Future<String> resetPassword(String email, String code, String newPassword) async {
-    return _postForMessage(
+  Future<String> resetPassword(String username, String code, String newPassword) async {
+    final data = await _post(
       AppConstants.resetPasswordEndpoint,
-      {'email': email.trim().toLowerCase(), 'code': code.trim(), 'new_password': newPassword},
+      {'username': username.trim(), 'code': code.trim(), 'new_password': newPassword},
       'Could not reset the password. Please try again.',
+    );
+    return data['message'] as String;
+  }
+
+  // --- First-login account setup ---
+
+  Future<String> sendEmailCode(String email, String token) async {
+    final data = await _post(
+      AppConstants.emailSendCodeEndpoint,
+      {'email': email.trim().toLowerCase()},
+      'Could not send the verification code. Please try again.',
+      token: token,
+    );
+    return data['message'] as String;
+  }
+
+  /// Returns the updated profile (email_verified, must_change_password).
+  Future<Map<String, dynamic>> verifyEmail(String code, String token) {
+    return _post(
+      AppConstants.emailVerifyEndpoint,
+      {'code': code.trim()},
+      'Could not verify the code. Please try again.',
+      token: token,
     );
   }
 
-  Future<String> _postForMessage(String url, Map<String, String> body, String fallbackError) async {
+  Future<Map<String, dynamic>> setPassword(String newPassword, String token) {
+    return _post(
+      AppConstants.setPasswordEndpoint,
+      {'new_password': newPassword},
+      'Could not save the new password. Please try again.',
+      token: token,
+    );
+  }
+
+  // --- Admin ---
+
+  Future<String> adminResetStudentPassword(int studentId, String token) async {
+    final data = await _post(
+      '${AppConstants.adminStudentsEndpoint}/$studentId/reset-password',
+      {},
+      'Could not reset the password. Please try again.',
+      token: token,
+    );
+    return data['message'] as String;
+  }
+
+  Future<Map<String, dynamic>> _post(
+    String url,
+    Map<String, String> body,
+    String fallbackError, {
+    String? token,
+  }) async {
     try {
       final response = await _client.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: _headers(token),
         body: jsonEncode(body),
       );
+      if (token != null) _checkSession(response);
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return data['message'] as String;
+        return data as Map<String, dynamic>;
       }
       final detail = data['detail'];
       throw Exception(detail is String ? detail : fallbackError);

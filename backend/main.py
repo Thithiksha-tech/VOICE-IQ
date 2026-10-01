@@ -1,4 +1,5 @@
 import os
+import secrets
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -40,37 +41,28 @@ app.include_router(audio_router.router)
 app.include_router(history_router.router)
 app.include_router(admin_router.router)
 
-# Seed default administrator and sample student on first startup
+# Create the single administrator on first startup. Credentials come from the environment
+# (ADMIN_EMAIL / ADMIN_PASSWORD) so they never appear in the public repository.
 @app.on_event("startup")
-def seed_default_accounts():
+def seed_admin_account():
     db = SessionLocal()
     try:
-        # Seed Admin Account
-        admin = db.query(models.User).filter(models.User.email == "admin@voiceiq.edu").first()
-        if not admin:
-            admin_user = models.User(
-                name="Prof. Sharma (MCA Department)",
-                email="admin@voiceiq.edu",
-                password_hash=auth.get_password_hash("Admin@12345"),
-                role="admin"
-            )
-            db.add(admin_user)
-            db.commit()
-            print(">> Seeded default admin account: admin@voiceiq.edu (Password: Admin@12345)")
-
-        # Seed Sample Student
-        student = db.query(models.User).filter(models.User.email == "student@voiceiq.edu").first()
-        if not student:
-            student_user = models.User(
-                name="Aarav Patel",
-                email="student@voiceiq.edu",
-                password_hash=auth.get_password_hash("Student@12345"),
-                role="student"
-            )
-            db.add(student_user)
-            db.commit()
-            print(">> Seeded default student account: student@voiceiq.edu (Password: Student@12345)")
-
+        if db.query(models.User).filter(models.User.role == "admin").first():
+            return
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@voiceiq.edu").strip().lower()
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        if not admin_password:
+            admin_password = secrets.token_urlsafe(12)
+            print(f">> ADMIN_PASSWORD not set; generated admin password for {admin_email}: {admin_password}")
+        db.add(models.User(
+            name=os.getenv("ADMIN_NAME", "VoiceIQ Admin"),
+            email=admin_email,
+            email_verified=True,
+            password_hash=auth.get_password_hash(admin_password),
+            role="admin",
+        ))
+        db.commit()
+        print(f">> Created admin account: {admin_email}")
     except Exception as e:
         print(f">> Startup seeding notice: {e}")
     finally:

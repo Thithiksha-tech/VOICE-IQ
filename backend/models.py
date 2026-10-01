@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -8,7 +8,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
-    email = Column(String(150), unique=True, index=True, nullable=False)
+    register_number = Column(String(30), unique=True, index=True, nullable=True)  # students sign in with this
+    email = Column(String(150), unique=True, index=True, nullable=True)  # set by the student and verified
+    email_verified = Column(Boolean, default=False, nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)  # true while on the default password
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default="student", nullable=False)  # "student" or "admin"
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
@@ -17,11 +20,14 @@ class User(Base):
     sessions = relationship("PracticeSession", back_populates="student", cascade="all, delete-orphan")
 
 
-class PasswordReset(Base):
-    __tablename__ = "password_resets"
+class VerificationCode(Base):
+    """6-digit codes emailed for password resets and email verification."""
+    __tablename__ = "verification_codes"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose = Column(String(20), nullable=False)  # "reset_password" or "verify_email"
+    email = Column(String(150), nullable=False)  # address the code was sent to
     code_hash = Column(String(255), nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
     expires_at = Column(DateTime, nullable=False)

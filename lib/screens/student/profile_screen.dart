@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 import '../auth/login_screen.dart';
+import '../auth/forgot_password_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -49,7 +50,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user?.email ?? '',
+                  user?.registerNumber != null ? 'Register No. ${user!.registerNumber}' : (user?.email ?? ''),
                   style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
                 ),
                 const SizedBox(height: 10),
@@ -62,6 +63,49 @@ class ProfileScreen extends StatelessWidget {
                   child: Text(
                     user?.role.toUpperCase() ?? 'STUDENT',
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppConstants.primaryLight),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Account: verified email and password change by emailed code
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.manage_accounts_outlined, color: AppConstants.primaryLight, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Account',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (user?.registerNumber != null) _buildInfoRow('Register No.', user!.registerNumber!),
+                _buildInfoRow('Email', user?.email ?? 'Not set'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.lock_reset_rounded),
+                    label: const Text('Change password'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(initialUsername: user?.loginId ?? ''),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -94,7 +138,7 @@ class ProfileScreen extends StatelessWidget {
                 _buildInfoRow('Project', 'VoiceIQ AI Speech Coach'),
                 _buildInfoRow('Mobile Engine', 'Flutter 3.x + Dart'),
                 _buildInfoRow('Backend Engine', 'FastAPI (Python 3.10+)'),
-                _buildInfoRow('Database Layer', 'SQLite 3 (SQLAlchemy ORM)'),
+                _buildInfoRow('Database Layer', 'PostgreSQL (SQLAlchemy ORM)'),
                 _buildInfoRow('Active Server IP', AppConstants.apiBaseUrl),
                 _buildInfoRow('Speech-to-Text', 'Whisper / Gemini AI Model'),
                 _buildInfoRow('Evaluation Core', 'Multi-metric Syntactic NLP'),

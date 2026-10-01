@@ -4,6 +4,7 @@ import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'utils/constants.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/account_setup_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 
@@ -84,6 +85,10 @@ class AuthWrapper extends StatelessWidget {
     if (auth.isAuthenticated) {
       if (auth.isAdmin) {
         return const AdminDashboardScreen();
+      }
+      // First sign-in: verify email and replace the default password
+      if (auth.currentUser!.needsSetup) {
+        return const AccountSetupScreen();
       }
       return const StudentDashboardScreen();
     }

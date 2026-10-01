@@ -4,7 +4,6 @@ import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 import '../../main.dart';
-import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,13 +15,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -32,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final auth = Provider.of<AuthService>(context, listen: false);
     final success = await auth.login(
-      _emailController.text.trim(),
+      _usernameController.text.trim(),
       _passwordController.text.trim(),
     );
 
@@ -48,14 +47,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _openForgotPassword() async {
     Provider.of<AuthService>(context, listen: false).clearError();
-    final email = await Navigator.push<String>(
+    final username = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+        builder: (_) => ForgotPasswordScreen(initialUsername: _usernameController.text.trim()),
       ),
     );
-    if (email != null && mounted) {
-      _emailController.text = email;
+    if (username != null && mounted) {
+      _usernameController.text = username;
       _passwordController.clear();
     }
   }
@@ -136,18 +135,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                  // Email Field
+                  // Register number (students) or email (admin)
                   TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _usernameController,
+                    keyboardType: TextInputType.visiblePassword,
+                    textCapitalization: TextCapitalization.characters,
+                    autocorrect: false,
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
+                      labelText: 'Register Number',
+                      helperText: 'Staff: sign in with your email',
+                      prefixIcon: const Icon(Icons.badge_outlined),
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    validator: (val) => val == null || val.isEmpty ? 'Please enter email' : null,
+                    validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your register number' : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -186,34 +188,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     isLoading: auth.isLoading,
                     icon: Icons.login_rounded,
                     onPressed: _handleLogin,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Register Navigation
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "Don't have an account? ",
-                        style: TextStyle(color: AppConstants.textSecondary),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          auth.clearError();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                          );
-                        },
-                        child: const Text(
-                          'Register Here',
-                          style: TextStyle(
-                            color: AppConstants.primaryLight,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),

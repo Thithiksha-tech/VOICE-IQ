@@ -4,19 +4,16 @@ import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../models/session_model.dart';
-import '../../utils/constants.dart';
-import '../../widgets/score_badge.dart';
+import '../../models/dashboard_model.dart';
 import '../student/session_detail_screen.dart';
 
 class AdminStudentDetailScreen extends StatefulWidget {
-  final int studentId;
-  final String studentName;
+  final AdminStudentSummaryModel student;
 
-  const AdminStudentDetailScreen({
-    super.key,
-    required this.studentId,
-    required this.studentName,
-  });
+  const AdminStudentDetailScreen({super.key, required this.student});
+
+  int get studentId => student.id;
+  String get studentName => student.name;
 
   @override
   State<AdminStudentDetailScreen> createState() => _AdminStudentDetailScreenState();
@@ -32,6 +29,38 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
   void initState() {
     super.initState();
     _fetchStudentHistory();
+  }
+
+  Future<void> _confirmResetPassword() async {
+    final st = widget.student;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset password?'),
+        content: Text(
+          "${st.name}'s password will go back to the default for register number ${st.registerNumber}. "
+          'They will be asked to choose a new one at their next sign-in.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final token = Provider.of<AuthService>(context, listen: false).currentUser?.token;
+    if (token == null) return;
+    try {
+      final message = await _apiService.adminResetStudentPassword(st.id, token);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    }
   }
 
   Future<void> _fetchStudentHistory() async {
@@ -97,7 +126,16 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
                               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             const SizedBox(height: 4),
-                            Text('Student ID: #${widget.studentId} • Enrolled Student', style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                            Text(
+                              'Reg. No. ${widget.student.registerNumber ?? '-'} • '
+                              '${widget.student.activated ? 'Active' : 'Not activated'}',
+                              style: const TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.student.email ?? 'Email not set up yet',
+                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                            ),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -121,6 +159,27 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
+
+                      // Skill breakdown: average of each AI-evaluated skill
+                      if (widget.student.sessionsCount > 0) ...[
+                        const Text(
+                          'Skill Averages',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: Column(
+                            children: widget.student.skillAverages.entries.map(_buildSkillBar).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
 
                       // Practice History
                       const Text(
@@ -202,9 +261,53 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
                             );
                           },
                         ),
+                      const SizedBox(height: 28),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.orangeAccent,
+                            side: const BorderSide(color: Colors.orangeAccent),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: const Icon(Icons.lock_reset_rounded),
+                          label: const Text('Reset password to default'),
+                          onPressed: _confirmResetPassword,
+                        ),
+                      ),
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildSkillBar(MapEntry<String, double> skill) {
+    final label = '${skill.key[0].toUpperCase()}${skill.key.substring(1)}';
+    final color = skill.value >= 75 ? Colors.greenAccent : (skill.value >= 50 ? Colors.amber : Colors.redAccent);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              Text(skill.value.toStringAsFixed(0), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (skill.value / 100).clamp(0, 1),
+              minHeight: 7,
+              backgroundColor: Colors.white10,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

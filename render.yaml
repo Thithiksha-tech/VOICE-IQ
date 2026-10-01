@@ -1,5 +1,6 @@
-# Render Blueprint: deploys the VoiceIQ FastAPI backend with a PostgreSQL database.
-# Render dashboard -> New -> Blueprint -> pick this repo. You will be asked for GEMINI_API_KEY.
+# Render Blueprint: deploys the VoiceIQ FastAPI backend.
+# Render dashboard -> New -> Blueprint -> pick this repo. Values marked sync: false are entered
+# in the dashboard (Environment tab) and never stored in this public repository.
 services:
   - type: web
     name: voiceiq-backend
@@ -16,18 +17,16 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      # Password reset emails via Brevo (free): API key + a verified sender address
+      # PostgreSQL connection string (Neon free tier: does not expire)
+      - key: DATABASE_URL
+        sync: false
+      # The single administrator, created on first startup
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Password reset / email verification via Brevo (free): API key + a verified sender address
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM
         sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: voiceiq-db
-          property: connectionString
-
-databases:
-  - name: voiceiq-db
-    plan: free
-    databaseName: voiceiq
-    user: voiceiq
