@@ -47,6 +47,12 @@ app.include_router(admin_router.router)
 def seed_admin_account():
     db = SessionLocal()
     try:
+        # Analyses interrupted by a restart can never finish; let the app tell the student
+        db.query(models.AnalysisJob).filter(models.AnalysisJob.status == "processing").update(
+            {"status": "failed", "error": "The analysis was interrupted. Please record and submit again."}
+        )
+        db.commit()
+
         if db.query(models.User).filter(models.User.role == "admin").first():
             return
         admin_email = os.getenv("ADMIN_EMAIL", "admin@voiceiq.edu").strip().lower()

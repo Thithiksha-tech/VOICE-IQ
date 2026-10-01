@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/audio_service.dart';
 import '../../services/api_service.dart';
+import '../../services/analysis_watcher.dart';
+import '../../services/notification_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 import 'analysis_result_screen.dart';
@@ -24,6 +26,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
   List<String> _questions = [];
   String? _selectedPrompt;
   bool _isSubmitting = false;
+  int? _pendingJobId; // background analysis in progress
+  AnalysisWatcher? _watcher;
   String? _statusMessage;
   String? _errorMessage;
 
@@ -40,6 +44,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   @override
   void dispose() {
+    // Left while analyzing: the watcher shows a notification when the result is ready
+    if (_pendingJobId != null) _watcher?.notifyInBackground(_pendingJobId!);
     _audioService.dispose();
     super.dispose();
   }
@@ -122,41 +128,53 @@ class _PracticeScreenState extends State<PracticeScreen> {
       return;
     }
 
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final token = auth.currentUser?.token;
+    final token = Provider.of<AuthService>(context, listen: false).currentUser?.token;
     if (token == null) return;
+    _watcher = Provider.of<AnalysisWatcher>(context, listen: false);
 
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
-      _statusMessage = 'Uploading your voice recording...';
+      _statusMessage = 'Uploading your recording...';
     });
 
     try {
-      // Step 1: Upload and perform real AI processing
-      setState(() {
-        _statusMessage = 'Transcribing speech & analyzing communication metrics...';
-      });
-
-      final session = await _apiService.uploadAndAnalyzeAudio(
+      await NotificationService.requestPermission();
+      final jobId = await _apiService.startAnalysis(
         audioPath: _audioService.recordedFilePath!,
         prompt: _selectedPrompt!,
         durationSec: _audioService.recordingDuration.toDouble(),
         token: token,
       );
+      if (!mounted) return;
+      setState(() {
+        _pendingJobId = jobId;
+        _statusMessage = 'Analyzing your speech...';
+      });
 
-      if (mounted) {
-        // Clean up local temp recording
-        await _audioService.deleteRecording();
+      final outcome = await _watcher!.track(jobId, token);
+      _pendingJobId = null;
+      if (!mounted) return; // student left; the watcher already notified them
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AnalysisResultScreen(session: session),
-          ),
-        );
+      if (!outcome.success) {
+        // Keep the recording so they can retry without re-recording
+        setState(() {
+          _isSubmitting = false;
+          _statusMessage = null;
+          _errorMessage = outcome.error ?? 'Analysis failed. Please try again.';
+        });
+        return;
       }
+
+      final session = await _apiService.getSessionDetail(outcome.sessionId!, token);
+      await _audioService.deleteRecording();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => AnalysisResultScreen(session: session)),
+      );
     } catch (e) {
+      _pendingJobId = null;
       if (mounted) {
         setState(() {
           _isSubmitting = false;
@@ -373,11 +391,22 @@ class _PracticeScreenState extends State<PracticeScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppConstants.primaryColor),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'AI is transcribing audio and evaluating oral communication parameters.',
+                          Text(
+                            _pendingJobId == null
+                                ? 'Sending your recording to the AI coach.'
+                                : 'This usually takes 10-30 seconds. You can go back and keep using the app; '
+                                    "we'll notify you when your result is ready.",
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: AppConstants.textSecondary),
+                            style: const TextStyle(fontSize: 12, color: AppConstants.textSecondary),
                           ),
+                          if (_pendingJobId != null) ...[
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.notifications_active_outlined),
+                              label: const Text('Go back – notify me when ready'),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
                         ],
                       ),
                     ),

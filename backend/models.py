@@ -34,6 +34,19 @@ class VerificationCode(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
 
+class AnalysisJob(Base):
+    """A recording being analyzed in the background; becomes a PracticeSession when done."""
+    __tablename__ = "analysis_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    prompt = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="processing")  # processing | done | failed
+    error = Column(Text, nullable=True)
+    session_id = Column(Integer, ForeignKey("practice_sessions.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
 class PracticeSession(Base):
     __tablename__ = "practice_sessions"
 

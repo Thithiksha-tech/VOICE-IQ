@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/analysis_watcher.dart';
 import '../../models/dashboard_model.dart';
 import '../../models/session_model.dart';
 import '../../utils/constants.dart';
@@ -27,11 +28,30 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   bool _isLoading = true;
   String? _error;
   int _currentTabIndex = 0;
+  late final AnalysisWatcher _watcher;
+  int _seenCompleted = 0;
 
   @override
   void initState() {
     super.initState();
+    _watcher = Provider.of<AnalysisWatcher>(context, listen: false);
+    _seenCompleted = _watcher.completedCount;
+    _watcher.addListener(_onAnalysisFinished);
     _loadDashboard();
+  }
+
+  @override
+  void dispose() {
+    _watcher.removeListener(_onAnalysisFinished);
+    super.dispose();
+  }
+
+  /// A background analysis finished: show the new score without a manual refresh
+  void _onAnalysisFinished() {
+    if (_watcher.completedCount != _seenCompleted && mounted) {
+      _seenCompleted = _watcher.completedCount;
+      _loadDashboard();
+    }
   }
 
   Future<void> _loadDashboard() async {

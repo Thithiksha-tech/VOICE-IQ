@@ -37,7 +37,8 @@ class AppConstants {
   static const String emailSendCodeEndpoint = '$apiBaseUrl/api/auth/email/send-code';
   static const String emailVerifyEndpoint = '$apiBaseUrl/api/auth/email/verify';
   static const String setPasswordEndpoint = '$apiBaseUrl/api/auth/set-password';
-  static const String analyzeEndpoint = '$apiBaseUrl/api/audio/analyze';
+  static const String analyzeAsyncEndpoint = '$apiBaseUrl/api/audio/analyze-async';
+  static const String analysisJobsEndpoint = '$apiBaseUrl/api/audio/jobs';
   static const String studentDashboardEndpoint = '$apiBaseUrl/api/history/dashboard/me';
   static const String studentHistoryEndpoint = '$apiBaseUrl/api/history/student';
   static const String sessionDetailEndpoint = '$apiBaseUrl/api/history';

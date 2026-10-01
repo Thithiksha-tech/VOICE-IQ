@@ -83,7 +83,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final scores = _sessions.map((s) => s.overallScore ?? 0.0).toList();
     final avgScore = scores.reduce((a, b) => a + b) / scores.length;
     final highest = scores.reduce((a, b) => a > b ? a : b);
-    final lowest = scores.reduce((a, b) => a < b ? a : b);
 
     // Calculate metric averages from speech_analysis
     final analyses = _sessions.where((s) => s.analysis != null).map((s) => s.analysis!).toList();

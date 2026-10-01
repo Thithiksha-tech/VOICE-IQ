@@ -1,13 +1,12 @@
 import os
 import time
 import shutil
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, SessionLocal
 import models
 import schemas
 import auth
-from services.whisper_service import transcription_service
 from services.analysis_service import analysis_service
 
 router = APIRouter(prefix="/api/audio", tags=["Audio & Speech Analysis"])
@@ -15,35 +14,16 @@ router = APIRouter(prefix="/api/audio", tags=["Audio & Speech Analysis"])
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./data/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/analyze", response_model=schemas.AudioAnalyzeResponse)
-async def analyze_audio_session(
-    prompt: str = Form(...),
-    duration: float = Form(30.0),
-    audio: UploadFile = File(...),
-    current_user: models.User = Depends(auth.get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Receives real microphone audio from the student, saves it safely,
-    calls AI transcription, evaluates speech metrics, and stores the session.
-    """
-    if not prompt or not prompt.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Speaking prompt is required."
-        )
+ALLOWED_EXTS = [".wav", ".m4a", ".mp3", ".aac", ".webm", ".ogg", ".mp4", ".3gp"]
+AI_BUSY_MESSAGE = "The AI service is busy right now. Please try again in a minute."
 
-    # Validate file extension
-    allowed_exts = [".wav", ".m4a", ".mp3", ".aac", ".webm", ".ogg", ".mp4", ".3gp"]
+
+async def save_upload(audio: UploadFile, user_id: int) -> str:
+    """Stores the uploaded recording and returns its path."""
     file_ext = os.path.splitext(audio.filename)[1].lower() if audio.filename else ".wav"
-    if not file_ext or file_ext not in allowed_exts:
+    if file_ext not in ALLOWED_EXTS:
         file_ext = ".wav"
-
-    timestamp = int(time.time())
-    safe_filename = f"user_{current_user.id}_{timestamp}{file_ext}"
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
-
-    # Save audio stream safely to disk
+    file_path = os.path.join(UPLOAD_DIR, f"user_{user_id}_{int(time.time() * 1000)}{file_ext}")
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(audio.file, buffer)
@@ -54,93 +34,129 @@ async def analyze_audio_session(
         )
     finally:
         await audio.close()
+    return file_path
 
-    # Step 1: AI Speech-to-Text Transcription
+
+def remove_file(path: str) -> None:
     try:
-        transcript = await transcription_service.transcribe_audio(file_path)
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def save_session(db: Session, student_id: int, prompt: str, file_path: str, data: dict) -> models.PracticeSession:
+    """Persists a finished analysis as a practice session."""
+    session = models.PracticeSession(
+        student_id=student_id,
+        prompt=prompt.strip(),
+        audio_path=file_path,
+        transcript=data["transcript"],
+        overall_score=data["overall_score"],
+    )
+    db.add(session)
+    db.flush()
+    db.add(models.SpeechAnalysis(
+        practice_session_id=session.id,
+        fluency_score=data["fluency_score"],
+        pronunciation_score=data["pronunciation_score"],
+        grammar_score=data["grammar_score"],
+        vocabulary_score=data["vocabulary_score"],
+        confidence_score=data["confidence_score"],
+        words_per_minute=data["words_per_minute"],
+        filler_word_count=data["filler_word_count"],
+        feedback=data["feedback"],
+    ))
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def require_prompt(prompt: str) -> None:
+    if not prompt or not prompt.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Speaking prompt is required.")
+
+
+@router.post("/analyze", response_model=schemas.AudioAnalyzeResponse)
+async def analyze_audio_session(
+    prompt: str = Form(...),
+    duration: float = Form(30.0),
+    audio: UploadFile = File(...),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Analyzes a recording and waits for the result (used by older app versions)."""
+    require_prompt(prompt)
+    file_path = await save_upload(audio, current_user.id)
+    try:
+        data = await analysis_service.analyze_recording(file_path, prompt, duration)
     except ValueError as e:
-        # Expected user validation error (e.g. empty audio, silence)
-        # Clean up temporary file to avoid clutter
-        if os.path.exists(file_path):
-            try: os.remove(file_path)
-            except: pass
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        remove_file(file_path)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        # Service or network failure
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI Transcription service encountered an issue: {str(e)}"
-        )
+        print(f"[Analysis Error] {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=AI_BUSY_MESSAGE)
 
-    if not transcript or len(transcript.strip()) < 2:
-        if os.path.exists(file_path):
-            try: os.remove(file_path)
-            except: pass
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No intelligible speech was recognized in your recording. Please try speaking closer to the microphone."
-        )
+    session = save_session(db, current_user.id, prompt, file_path, data)
+    return schemas.AudioAnalyzeResponse(
+        session_id=session.id,
+        prompt=session.prompt,
+        transcript=session.transcript,
+        overall_score=session.overall_score,
+        analysis=schemas.SpeechAnalysisSchema.from_orm(session.analysis),
+    )
 
-    # Step 2: AI Speech & Communication Analysis
+
+async def run_analysis_job(job_id: int, student_id: int, prompt: str, file_path: str, duration: float) -> None:
+    """Background worker: analyzes the recording and records the outcome on the job."""
+    db = SessionLocal()
     try:
-        analysis_data = await analysis_service.analyze_speech(
-            prompt=prompt,
-            transcript=transcript,
-            audio_duration_sec=duration
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Speech analysis model failed: {str(e)}"
-        )
-
-    # Step 3: Persist Practice Session & Analysis to SQLite Database
-    try:
-        new_session = models.PracticeSession(
-            student_id=current_user.id,
-            prompt=prompt.strip(),
-            audio_path=file_path,
-            transcript=transcript,
-            overall_score=analysis_data["overall_score"]
-        )
-        db.add(new_session)
+        job = db.query(models.AnalysisJob).filter(models.AnalysisJob.id == job_id).first()
+        try:
+            data = await analysis_service.analyze_recording(file_path, prompt, duration)
+            session = save_session(db, student_id, prompt, file_path, data)
+            job.status, job.session_id = "done", session.id
+        except ValueError as e:
+            remove_file(file_path)
+            job.status, job.error = "failed", str(e)
+        except Exception as e:
+            print(f"[Analysis Error] job {job_id}: {e}")
+            db.rollback()
+            job = db.query(models.AnalysisJob).filter(models.AnalysisJob.id == job_id).first()
+            job.status, job.error = "failed", AI_BUSY_MESSAGE
         db.commit()
-        db.refresh(new_session)
+    finally:
+        db.close()
 
-        new_analysis = models.SpeechAnalysis(
-            practice_session_id=new_session.id,
-            fluency_score=analysis_data["fluency_score"],
-            pronunciation_score=analysis_data["pronunciation_score"],
-            grammar_score=analysis_data["grammar_score"],
-            vocabulary_score=analysis_data["vocabulary_score"],
-            confidence_score=analysis_data["confidence_score"],
-            words_per_minute=analysis_data["words_per_minute"],
-            filler_word_count=analysis_data["filler_word_count"],
-            feedback=analysis_data["feedback"]
-        )
-        db.add(new_analysis)
-        db.commit()
-        db.refresh(new_analysis)
 
-        return schemas.AudioAnalyzeResponse(
-            session_id=new_session.id,
-            prompt=new_session.prompt,
-            transcript=new_session.transcript,
-            overall_score=new_session.overall_score,
-            analysis=schemas.SpeechAnalysisSchema.from_orm(new_analysis)
-        )
+@router.post("/analyze-async", response_model=schemas.AnalysisJobResponse)
+async def start_analysis(
+    background_tasks: BackgroundTasks,
+    prompt: str = Form(...),
+    duration: float = Form(30.0),
+    audio: UploadFile = File(...),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Accepts a recording and returns at once; the app polls /jobs/{id} and notifies when done."""
+    require_prompt(prompt)
+    file_path = await save_upload(audio, current_user.id)
+    job = models.AnalysisJob(student_id=current_user.id, prompt=prompt.strip(), status="processing")
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    background_tasks.add_task(run_analysis_job, job.id, current_user.id, prompt, file_path, duration)
+    return schemas.AnalysisJobResponse(job_id=job.id, status=job.status)
 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error while saving practice analysis: {str(e)}"
-        )
+
+@router.get("/jobs/{job_id}", response_model=schemas.AnalysisJobResponse)
+def get_analysis_job(
+    job_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    job = db.query(models.AnalysisJob).filter(
+        models.AnalysisJob.id == job_id, models.AnalysisJob.student_id == current_user.id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis not found.")
+    return schemas.AnalysisJobResponse(job_id=job.id, status=job.status, error=job.error, session_id=job.session_id)

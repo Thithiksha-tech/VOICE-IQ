@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'services/analysis_watcher.dart';
+import 'services/notification_service.dart';
 import 'utils/constants.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/account_setup_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/student/session_detail_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+  // Tapping "your analysis is ready" opens that result
+  NotificationService.onOpenSession = (sessionId) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => SessionDetailScreen(sessionId: sessionId)),
+    );
+  };
   runApp(const VoiceIQApp());
 }
 
@@ -31,6 +41,7 @@ class VoiceIQApp extends StatelessWidget {
           };
           return auth;
         }),
+        ChangeNotifierProvider(create: (_) => AnalysisWatcher()),
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,

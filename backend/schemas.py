@@ -94,6 +94,12 @@ class PracticeSessionSchema(BaseModel):
     class Config:
         from_attributes = True
 
+class AnalysisJobResponse(BaseModel):
+    job_id: int
+    status: str  # processing | done | failed
+    error: Optional[str] = None
+    session_id: Optional[int] = None
+
 class AudioAnalyzeResponse(BaseModel):
     session_id: int
     prompt: str

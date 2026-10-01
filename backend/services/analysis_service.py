@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from typing import Dict, Any
 from dotenv import load_dotenv
 
@@ -21,12 +22,86 @@ def count_filler_words(text: str) -> int:
         total += len(matches)
     return total
 
+AUDIO_MIME_TYPES = {
+    ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".aac": "audio/aac", ".mp3": "audio/mp3",
+    ".wav": "audio/wav", ".webm": "audio/webm", ".ogg": "audio/ogg", ".3gp": "audio/3gpp",
+}
+
+NO_SPEECH_MESSAGE = "No speech could be detected in your recording. Please check your microphone and try speaking again."
+
+
 class SpeechAnalysisService:
     """Performs deep speech communication analysis using real AI models."""
 
     def __init__(self):
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.openai_key = os.getenv("OPENAI_API_KEY")
+
+    async def analyze_recording(self, audio_file_path: str, prompt: str, audio_duration_sec: float) -> Dict[str, Any]:
+        """
+        Transcribes and evaluates a recording in ONE Gemini call (about 5 s, versus two calls before).
+        Returns the analysis fields plus "transcript". Raises ValueError when no usable speech is found.
+        """
+        if os.path.getsize(audio_file_path) < 1000:
+            raise ValueError("Audio recording is empty or too short. Please speak clearly into the microphone.")
+        if not self.gemini_key:
+            raise RuntimeError("Speech analysis is unavailable: GEMINI_API_KEY is not configured.")
+
+        with open(audio_file_path, "rb") as f:
+            audio_bytes = f.read()
+        mime_type = AUDIO_MIME_TYPES.get(os.path.splitext(audio_file_path)[1].lower(), "audio/mp4")
+
+        instructions = f"""
+You are an expert speech coach evaluating a student's spoken answer.
+Speaking prompt: "{prompt}"
+
+1. Transcribe every spoken word in the audio verbatim, keeping filler words like "um" and "uh".
+   If there is no audible speech, return {{"transcript": ""}} and nothing else.
+2. Evaluate the answer strictly from what was actually said and how it sounded. Score 0-100, realistically:
+   be strict with irrelevant, repetitive, very short or grammatically broken answers.
+
+Respond ONLY with JSON:
+{{
+  "transcript": "<verbatim transcript>",
+  "overall_score": <0-100>,
+  "fluency_score": <0-100, pacing, flow and pauses>,
+  "pronunciation_score": <0-100, clarity of words as heard in the audio>,
+  "grammar_score": <0-100, sentence construction>,
+  "vocabulary_score": <0-100, range and appropriateness of words>,
+  "confidence_score": <0-100, steady delivery without excessive hesitation>,
+  "feedback": "<2 short paragraphs: strengths, and specific sentences to improve>",
+  "improvement_suggestions": ["<actionable tip 1>", "<actionable tip 2>", "<actionable tip 3>"]
+}}
+"""
+
+        def call_gemini():
+            from google import genai
+            from google.genai import types
+            from services.gemini_client import generate_with_fallback
+            client = genai.Client(api_key=self.gemini_key)
+            return generate_with_fallback(
+                client,
+                contents=[types.Part.from_bytes(data=audio_bytes, mime_type=mime_type), instructions],
+                config={"response_mime_type": "application/json"},
+            )
+
+        # Run the blocking SDK call in a worker thread so other requests are not held up
+        response = await asyncio.to_thread(call_gemini)
+        parsed = json.loads(response.text or "{}")
+
+        transcript = str(parsed.get("transcript", "")).strip()
+        if len(transcript.split()) < 3:
+            raise ValueError(NO_SPEECH_MESSAGE)
+
+        fillers = count_filler_words(transcript)
+        duration_minutes = max(audio_duration_sec / 60.0, 0.15)
+        wpm = round(len(transcript.split()) / duration_minutes, 1)
+        result = self._sanitize_result(parsed, wpm, fillers)
+        # Measured values are more reliable than model estimates
+        result["words_per_minute"] = wpm
+        result["filler_word_count"] = fillers
+        result["transcript"] = transcript
+        return result
 
     async def analyze_speech(self, prompt: str, transcript: str, audio_duration_sec: float = 30.0) -> Dict[str, Any]:
         """

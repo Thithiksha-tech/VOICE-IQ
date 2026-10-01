@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -41,7 +42,7 @@ class ApiService {
         }),
       );
 
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return UserModel.fromJson(data);
       } else {
@@ -130,7 +131,7 @@ class ApiService {
       );
       if (token != null) _checkSession(response);
 
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return data as Map<String, dynamic>;
       }
@@ -143,45 +144,58 @@ class ApiService {
 
   // --- Real Audio Upload & AI Analysis ---
 
-  Future<PracticeSessionModel> uploadAndAnalyzeAudio({
+  /// Uploads a recording for background analysis and returns the job id at once.
+  Future<int> startAnalysis({
     required String audioPath,
     required String prompt,
     required double durationSec,
     required String token,
   }) async {
+    final file = File(audioPath);
+    if (!await file.exists()) {
+      throw Exception('Recorded audio file was not found on the device.');
+    }
+
+    final request = http.MultipartRequest('POST', Uri.parse(AppConstants.analyzeAsyncEndpoint));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['prompt'] = prompt;
+    request.fields['duration'] = durationSec.toStringAsFixed(1);
+    request.files.add(
+      await http.MultipartFile.fromPath('audio', audioPath, filename: audioPath.split(Platform.pathSeparator).last),
+    );
+
     try {
-      final file = File(audioPath);
-      if (!await file.exists()) {
-        throw Exception('Recorded audio file was not found on the device.');
-      }
-
-      final uri = Uri.parse(AppConstants.analyzeEndpoint);
-      final request = http.MultipartRequest('POST', uri);
-
-      request.headers['Authorization'] = 'Bearer $token';
-      request.fields['prompt'] = prompt;
-      request.fields['duration'] = durationSec.toStringAsFixed(1);
-
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'audio',
-          audioPath,
-          filename: audioPath.split(Platform.pathSeparator).last,
-        ),
-      );
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      // Generous limit: the free server may need up to a minute to wake up
+      final streamed = await request.send().timeout(const Duration(seconds: 90));
+      final response = await http.Response.fromStream(streamed);
       _checkSession(response);
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return PracticeSessionModel.fromJson(data);
-      } else {
-        throw Exception(data['detail'] ?? 'Failed to analyze recording. Please retry.');
-      }
+      final data = _decodeJson(response) as Map<String, dynamic>;
+      if (response.statusCode == 200) return data['job_id'] as int;
+      throw Exception(data['detail'] ?? 'Could not upload your recording. Please retry.');
     } on SocketException {
-      throw Exception('Network error while uploading audio. Verify Wi-Fi and server IP.');
+      throw Exception('No internet connection. Please check your network and try again.');
+    } on TimeoutException {
+      throw Exception('The server is taking too long to respond. Please try again in a minute.');
+    }
+  }
+
+  /// Returns {status: processing|done|failed, error, session_id} for a background analysis.
+  Future<Map<String, dynamic>> getAnalysisJob(int jobId, String token) async {
+    final response = await _client
+        .get(Uri.parse('${AppConstants.analysisJobsEndpoint}/$jobId'), headers: _headers(token))
+        .timeout(const Duration(seconds: 30));
+    _checkSession(response);
+    final data = _decodeJson(response) as Map<String, dynamic>;
+    if (response.statusCode == 200) return data;
+    throw Exception(data['detail'] ?? 'Could not check the analysis.');
+  }
+
+  /// Parses a JSON reply; a non-JSON reply (e.g. a gateway error page) becomes a readable error.
+  dynamic _decodeJson(http.Response response) {
+    try {
+      return jsonDecode(response.body);
+    } on FormatException {
+      throw Exception('The server is busy right now (error ${response.statusCode}). Please try again in a minute.');
     }
   }
 
@@ -195,7 +209,7 @@ class ApiService {
       );
 
       _checkSession(response);
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return StudentDashboardModel.fromJson(data);
       } else {
@@ -214,7 +228,7 @@ class ApiService {
       );
 
       _checkSession(response);
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return (data as List).map((i) => PracticeSessionModel.fromJson(i)).toList();
       } else {
@@ -233,7 +247,7 @@ class ApiService {
       );
 
       _checkSession(response);
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return PracticeSessionModel.fromJson(data);
       } else {
@@ -254,7 +268,7 @@ class ApiService {
       );
 
       _checkSession(response);
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return AdminDashboardModel.fromJson(data);
       } else {
@@ -273,7 +287,7 @@ class ApiService {
       );
 
       _checkSession(response);
-      final data = jsonDecode(response.body);
+      final data = _decodeJson(response);
       if (response.statusCode == 200) {
         return (data as List).map((i) => AdminStudentSummaryModel.fromJson(i)).toList();
       } else {

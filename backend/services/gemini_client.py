@@ -1,8 +1,9 @@
 from google import genai
 
 # Tried in order; later models are used only when an earlier one is overloaded
-# (503) or rate limited (429), which happens often during peak demand.
-GEMINI_MODELS = ["gemini-3.8-flash", "gemini-flash-lite-latest"]
+# (503) or rate limited (429). The lite model is fast (~5 s for a recording) and
+# has a far larger free quota, so it goes first.
+GEMINI_MODELS = ["gemini-flash-lite-latest", "gemini-3.8-flash"]
 
 
 def generate_with_fallback(client: genai.Client, **kwargs):

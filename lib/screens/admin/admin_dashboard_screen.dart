@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../models/dashboard_model.dart';
-import '../../utils/constants.dart';
-import '../../widgets/score_badge.dart';
 import '../auth/login_screen.dart';
 import 'admin_student_detail_screen.dart';
 
