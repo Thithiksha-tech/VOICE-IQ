@@ -24,6 +24,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String? _error;
   int _selectedTab = 0; // 0 = Overview, 1 = Student Roster
   String _search = '';
+  String _statusFilter = 'all'; // all | active | inactive
 
   @override
   void initState() {
@@ -332,12 +333,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     final query = _search.trim().toLowerCase();
-    final visible = query.isEmpty
-        ? _students
-        : _students
-            .where((s) =>
-                s.name.toLowerCase().contains(query) || (s.registerNumber ?? '').toLowerCase().contains(query))
-            .toList();
+    final activeCount = _students.where((s) => s.activated).length;
+    final visible = _students.where((s) {
+      if (_statusFilter == 'active' && !s.activated) return false;
+      if (_statusFilter == 'inactive' && s.activated) return false;
+      return query.isEmpty ||
+          s.name.toLowerCase().contains(query) ||
+          (s.registerNumber ?? '').toLowerCase().contains(query);
+    }).toList();
+
+    Widget filterChip(String value, String label) {
+      final selected = _statusFilter == value;
+      return ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => setState(() => _statusFilter = value),
+        showCheckmark: false,
+        labelStyle: TextStyle(
+          color: selected ? Colors.black : Colors.white70,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+        selectedColor: Colors.amber,
+        backgroundColor: const Color(0xFF1E293B),
+        side: BorderSide(color: selected ? Colors.amber : Colors.white12),
+      );
+    }
 
     return Column(
       children: [
@@ -354,6 +375,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               fillColor: const Color(0xFF1E293B),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              filterChip('all', 'All (${_students.length})'),
+              filterChip('active', 'Active ($activeCount)'),
+              filterChip('inactive', 'Not activated (${_students.length - activeCount})'),
+            ],
           ),
         ),
         Expanded(child: _buildStudentList(visible)),

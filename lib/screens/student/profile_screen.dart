@@ -5,6 +5,7 @@ import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 import '../auth/login_screen.dart';
 import '../auth/forgot_password_screen.dart';
+import 'change_email_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -94,6 +95,18 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 if (user?.registerNumber != null) _buildInfoRow('Register No.', user!.registerNumber!),
                 _buildInfoRow('Email', user?.email ?? 'Not set'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.alternate_email_rounded),
+                    label: const Text('Change email'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChangeEmailScreen()),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,

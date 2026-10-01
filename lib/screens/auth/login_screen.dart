@@ -138,8 +138,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Register number (students) or email (admin)
                   TextFormField(
                     controller: _usernameController,
-                    keyboardType: TextInputType.visiblePassword,
-                    textCapitalization: TextCapitalization.characters,
+                    // Lowercase keyboard with '@' for the admin's email; digits for register numbers
+                    keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
                     decoration: InputDecoration(
                       labelText: 'Register Number',

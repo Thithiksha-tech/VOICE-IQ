@@ -136,8 +136,13 @@ def send_email_code(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Emails a code to the address the student wants to link to their account."""
+    """Emails a code to the address the student wants to link (first setup or changing email)."""
     email = data.email.lower()
+    if current_user.email_verified and (current_user.email or "").lower() == email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This is already your email."
+        )
     taken = (
         db.query(models.User)
         .filter(func.lower(models.User.email) == email, models.User.id != current_user.id)
