@@ -64,9 +64,10 @@ class AuthService extends ChangeNotifier {
   }
 
 
-  /// Applies a profile returned by the server (e.g. after email verification), keeping the token.
+  /// Applies a profile returned by the server (e.g. after email verification). Uses the new
+  /// token when the server issued one (password changes invalidate older sign-ins).
   Future<void> applyProfile(Map<String, dynamic> profile) async {
-    final token = _currentUser?.token;
+    final token = profile['access_token'] as String? ?? _currentUser?.token;
     if (token == null) return;
     _currentUser = UserModel.fromJson(profile, token: token);
     await _persistSession(_currentUser!);

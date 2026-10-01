@@ -28,7 +28,9 @@ def find_user(db: Session, username: str) -> Optional[models.User]:
 
 
 def token_response(user: models.User) -> schemas.TokenResponse:
-    token = auth.create_access_token(data={"sub": str(user.id), "role": user.role})
+    token = auth.create_access_token(
+        data={"sub": str(user.id), "role": user.role, "pv": auth.password_fingerprint(user)}
+    )
     return schemas.TokenResponse(
         access_token=token,
         user_id=user.id,
@@ -189,13 +191,13 @@ def verify_email(
     return current_user
 
 
-@router.post("/auth/set-password", response_model=schemas.UserResponse)
+@router.post("/auth/set-password", response_model=schemas.TokenResponse)
 def set_password(
     data: schemas.SetPasswordRequest,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    """First-login only: replaces the default password once the email is verified."""
+    """First-login only: replaces the default password. Returns a new token (old ones stop working)."""
     if not current_user.must_change_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -215,7 +217,7 @@ def set_password(
     current_user.must_change_password = False
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return token_response(current_user)
 
 
 # --- Forgot / change password by email code ---

@@ -25,6 +25,10 @@ def get_password_hash(password: str) -> str:
     """Generates a secure salted bcrypt hash for a password."""
     return pwd_context.hash(password)
 
+def password_fingerprint(user: models.User) -> str:
+    """Changes whenever the password changes (each bcrypt hash has a fresh salt)."""
+    return user.password_hash[-12:]
+
 def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None) -> str:
     """Encodes a signed JWT with expiration timestamp."""
     to_encode = data.copy()
@@ -53,6 +57,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     user = db.query(models.User).filter(models.User.id == int(user_id)).first()
     if user is None:
+        raise credentials_exception
+    # Sign-ins made before a password change or admin reset stop working
+    if "pv" in payload and payload["pv"] != password_fingerprint(user):
         raise credentials_exception
     return user
 

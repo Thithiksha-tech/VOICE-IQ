@@ -105,11 +105,12 @@ class ApiService {
 
   // --- Admin ---
 
-  Future<String> adminResetStudentPassword(int studentId, String token) async {
+  /// Default password, email removed, first-login setup again; signs the student out everywhere.
+  Future<String> adminResetStudentLogin(int studentId, String token) async {
     final data = await _post(
-      '${AppConstants.adminStudentsEndpoint}/$studentId/reset-password',
+      '${AppConstants.adminStudentsEndpoint}/$studentId/reset-login',
       {},
-      'Could not reset the password. Please try again.',
+      'Could not reset the login. Please try again.',
       token: token,
     );
     return data['message'] as String;

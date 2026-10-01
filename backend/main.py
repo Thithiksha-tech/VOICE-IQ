@@ -74,7 +74,7 @@ def health_check():
     return {
         "status": "online",
         "service": "VoiceIQ AI Speech Backend",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "database": "connected"
     }
 

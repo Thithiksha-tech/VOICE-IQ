@@ -407,11 +407,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final weakest = st.weakestSkill;
 
         return InkWell(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final changed = await Navigator.push<bool>(
               context,
               MaterialPageRoute(builder: (_) => AdminStudentDetailScreen(student: st)),
             );
+            if (changed == true) _loadAdminData();
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(

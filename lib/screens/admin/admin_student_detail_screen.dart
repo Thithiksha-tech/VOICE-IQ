@@ -31,29 +31,78 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
     _fetchStudentHistory();
   }
 
-  Future<void> _confirmResetPassword() async {
+  /// Two confirmations: an explanation, then typing the register number's last 3 digits.
+  Future<void> _confirmResetLogin() async {
     final st = widget.student;
-    final confirmed = await showDialog<bool>(
+    final regNo = st.registerNumber ?? '';
+    final lastDigits = regNo.length >= 3 ? regNo.substring(regNo.length - 3) : regNo;
+
+    final proceed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset password?'),
+        title: const Text('Reset this login?'),
         content: Text(
-          "${st.name}'s password will go back to the default for register number ${st.registerNumber}. "
-          'They will be asked to choose a new one at their next sign-in.',
+          'This will, for ${st.name} ($regNo):\n\n'
+          '• set the password back to the default\n'
+          '• remove their email\n'
+          '• sign them out on every phone\n'
+          '• make them set up email and password again\n\n'
+          'Their practice history and scores are kept.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Reset')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Continue')),
         ],
       ),
+    );
+    if (proceed != true || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Confirm reset'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Type $lastDigits (the last 3 digits of $regNo) to reset ${st.name}'s login."),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 3,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(border: OutlineInputBorder(), counterText: ''),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: controller.text.trim() == lastDigits ? () => Navigator.pop(ctx, true) : null,
+                child: const Text('Reset login'),
+              ),
+            ],
+          ),
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
 
     final token = Provider.of<AuthService>(context, listen: false).currentUser?.token;
     if (token == null) return;
     try {
-      final message = await _apiService.adminResetStudentPassword(st.id, token);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = await _apiService.adminResetStudentLogin(st.id, token);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+      );
+      Navigator.pop(context, true); // tells the roster to reload
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -266,13 +315,13 @@ class _AdminStudentDetailScreenState extends State<AdminStudentDetailScreen> {
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orangeAccent,
-                            side: const BorderSide(color: Colors.orangeAccent),
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          icon: const Icon(Icons.lock_reset_rounded),
-                          label: const Text('Reset password to default'),
-                          onPressed: _confirmResetPassword,
+                          icon: const Icon(Icons.restart_alt_rounded),
+                          label: const Text('Reset login'),
+                          onPressed: _confirmResetLogin,
                         ),
                       ),
                     ],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 
@@ -75,6 +77,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _passwordController.text,
       );
       if (!mounted) return;
+      final auth = Provider.of<AuthService>(context, listen: false);
+      if (auth.isAuthenticated) {
+        // Changed from Profile: the old sign-in is no longer valid, so sign in again
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password changed. Please sign in with your new password.')),
+        );
+        Navigator.popUntil(context, (route) => route.isFirst);
+        await auth.logout();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       Navigator.pop(context, _emailController.text.trim());
     } catch (e) {

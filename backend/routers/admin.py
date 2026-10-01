@@ -63,22 +63,30 @@ def import_students(
     return schemas.StudentImportResponse(created=created, skipped_existing=skipped)
 
 
-@router.post("/students/{student_id}/reset-password", response_model=schemas.MessageResponse)
-def reset_student_password(
+@router.post("/students/{student_id}/reset-login", response_model=schemas.MessageResponse)
+def reset_student_login(
     student_id: int,
     admin: models.User = Depends(auth.get_current_admin),
     db: Session = Depends(get_db)
 ):
-    """Resets a student to the default password; they set a new one at next sign-in."""
+    """
+    Returns a student account to its first-day state: default password, no email, and
+    first-login setup required again. Signs the student out everywhere. Practice history is kept.
+    """
     student = db.query(models.User).filter(models.User.id == student_id, models.User.role == "student").first()
     if not student or not student.register_number:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student account not found.")
     student.password_hash = auth.get_password_hash(default_password(student.register_number))
+    student.email = None
+    student.email_verified = False
     student.must_change_password = True
+    db.query(models.VerificationCode).filter(models.VerificationCode.user_id == student.id).delete()
     db.commit()
     return schemas.MessageResponse(
-        message=f"{student.name}'s password was reset to the default: {default_password(student.register_number)}"
+        message=f"{student.name}'s login was reset. They can sign in with {student.register_number} "
+                f"and {default_password(student.register_number)}, then set up their email and password again."
     )
+
 
 @router.get("/dashboard", response_model=schemas.AdminDashboardResponse)
 def get_admin_dashboard(
