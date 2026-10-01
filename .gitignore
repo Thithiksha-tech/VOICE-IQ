@@ -7,6 +7,11 @@ coverage/
 .env*
 !.env.example
 
+# Student lists contain personal data; never commit them to this public repo
+*.xlsx
+*.xls
+*.csv
+
 # Flutter
 .dart_tool/
 .flutter-plugins-dependencies

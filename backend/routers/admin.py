@@ -10,12 +10,15 @@ import auth
 
 router = APIRouter(prefix="/api/admin", tags=["Administrator Dashboard"])
 
-# Default password for imported students: prefix + register number (e.g. cse@227)
+# Default password for imported students: prefix + last N digits of the register number
+# (e.g. 714024104189 -> cse@189). Set DEFAULT_PASSWORD_DIGITS=0 to use the full number.
 DEFAULT_PASSWORD_PREFIX = os.getenv("DEFAULT_PASSWORD_PREFIX", "cse@")
+DEFAULT_PASSWORD_DIGITS = int(os.getenv("DEFAULT_PASSWORD_DIGITS", "3"))
 
 
 def default_password(register_number: str) -> str:
-    return f"{DEFAULT_PASSWORD_PREFIX}{register_number}"
+    suffix = register_number[-DEFAULT_PASSWORD_DIGITS:] if DEFAULT_PASSWORD_DIGITS > 0 else register_number
+    return f"{DEFAULT_PASSWORD_PREFIX}{suffix}"
 
 
 def skill_averages(sessions) -> dict:
@@ -74,7 +77,7 @@ def reset_student_password(
     student.must_change_password = True
     db.commit()
     return schemas.MessageResponse(
-        message=f"{student.name}'s password was reset to the default ({DEFAULT_PASSWORD_PREFIX}<register number>)."
+        message=f"{student.name}'s password was reset to the default: {default_password(student.register_number)}"
     )
 
 @router.get("/dashboard", response_model=schemas.AdminDashboardResponse)
