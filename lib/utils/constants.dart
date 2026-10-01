@@ -32,7 +32,8 @@ class AppConstants {
   // API Endpoints
   static const String registerEndpoint = '$apiBaseUrl/api/auth/register';
   static const String loginEndpoint = '$apiBaseUrl/api/auth/login';
-  static const String adminLoginEndpoint = '$apiBaseUrl/api/admin/login';
+  static const String forgotPasswordEndpoint = '$apiBaseUrl/api/auth/forgot-password';
+  static const String resetPasswordEndpoint = '$apiBaseUrl/api/auth/reset-password';
   static const String analyzeEndpoint = '$apiBaseUrl/api/audio/analyze';
   static const String studentDashboardEndpoint = '$apiBaseUrl/api/history/dashboard/me';
   static const String studentHistoryEndpoint = '$apiBaseUrl/api/history/student';
@@ -51,12 +52,43 @@ class AppConstants {
   static const Color errorColor = Color(0xFFEF4444);
   static const Color warningColor = Color(0xFFF59E0B);
 
-  // Recommended MCA Viva & Placement Speaking Prompts
-  static const List<String> defaultPrompts = [
-    "Introduce yourself and explain the primary architecture of your MCA final year project.",
-    "Explain the concept of REST APIs and how asynchronous operations are handled in distributed systems.",
-    "Describe an engineering challenge you solved recently and how you debugged the root cause.",
-    "How would you explain the difference between relational databases and NoSQL stores to a stakeholder?",
-    "Deliver a 1-minute pitch on why voice communication analysis is critical for modern software engineers."
+  // Speaking practice question pool; the practice screen shows 5 at random
+  static const int questionsPerRound = 5;
+  static const List<String> questionPool = [
+    // Interview & self-presentation
+    "Tell me about yourself in under one minute.",
+    "What are your greatest strengths, and how have they helped you?",
+    "Describe a weakness you are working on and what you are doing about it.",
+    "Where do you see yourself five years from now?",
+    "Why should a company hire you over other candidates?",
+    "Tell me about a time you worked in a team to achieve a goal.",
+    "Describe a situation where you handled pressure or a tight deadline.",
+    "Tell me about a mistake you made and what you learned from it.",
+    // Everyday & personal
+    "Describe your favourite book or movie and why you recommend it.",
+    "Talk about a person who has inspired you the most.",
+    "Describe a memorable trip or place you have visited.",
+    "What is a hobby you enjoy, and how did you get started with it?",
+    "Describe your ideal weekend from morning to night.",
+    "Talk about a skill you would like to learn and why.",
+    // Opinion & discussion
+    "Should social media have age restrictions? Give your opinion.",
+    "Is online learning as effective as classroom learning?",
+    "What are the advantages and disadvantages of working from home?",
+    "How can young people contribute to protecting the environment?",
+    "Do you think artificial intelligence will create more jobs than it replaces?",
+    "Should mobile phones be allowed in classrooms?",
+    "What makes a good leader? Explain with an example.",
+    // Situational
+    "How would you handle a disagreement with a teammate?",
+    "Explain how you would plan a college event with a small budget.",
+    "You have three tasks due today. How do you decide what to do first?",
+    "How would you convince a friend to start exercising regularly?",
+    // Technology explained simply
+    "Explain how the internet works to someone who has never used it.",
+    "What is cloud computing? Explain it with an everyday example.",
+    "Describe a mobile app you use daily and how you would improve it.",
+    "Explain why cybersecurity matters for ordinary people.",
+    "Describe a project you built and the biggest challenge you faced.",
   ];
 }

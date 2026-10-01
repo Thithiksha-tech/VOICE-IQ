@@ -17,6 +17,17 @@ class User(Base):
     sessions = relationship("PracticeSession", back_populates="student", cascade="all, delete-orphan")
 
 
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash = Column(String(255), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
 class PracticeSession(Base):
     __tablename__ = "practice_sessions"
 

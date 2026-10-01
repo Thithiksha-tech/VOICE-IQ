@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
@@ -19,7 +20,9 @@ class PracticeScreen extends StatefulWidget {
 class _PracticeScreenState extends State<PracticeScreen> {
   late AudioService _audioService;
   final ApiService _apiService = ApiService();
-  late String _selectedPrompt;
+  final Random _random = Random();
+  List<String> _questions = [];
+  String? _selectedPrompt;
   bool _isSubmitting = false;
   String? _statusMessage;
   String? _errorMessage;
@@ -28,7 +31,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
   void initState() {
     super.initState();
     _audioService = AudioService();
-    _selectedPrompt = widget.initialPrompt ?? AppConstants.defaultPrompts.first;
+    _dealQuestions();
+    if (widget.initialPrompt != null) {
+      _questions[0] = widget.initialPrompt!;
+      _selectedPrompt = widget.initialPrompt;
+    }
   }
 
   @override
@@ -37,13 +44,74 @@ class _PracticeScreenState extends State<PracticeScreen> {
     super.dispose();
   }
 
-  void _cyclePrompt() {
-    final list = AppConstants.defaultPrompts;
-    final currentIndex = list.indexOf(_selectedPrompt);
-    final nextIndex = (currentIndex + 1) % list.length;
-    setState(() {
-      _selectedPrompt = list[nextIndex];
-    });
+  /// Picks a fresh random set of questions, avoiding the ones currently shown.
+  void _dealQuestions() {
+    final pool = AppConstants.questionPool.where((q) => !_questions.contains(q)).toList();
+    final source = pool.length >= AppConstants.questionsPerRound ? pool : List.of(AppConstants.questionPool);
+    source.shuffle(_random);
+    _questions = source.take(AppConstants.questionsPerRound).toList();
+    _selectedPrompt = null;
+  }
+
+  Future<void> _toggleRecording(bool isRecording) async {
+    if (isRecording) {
+      await _audioService.stopRecording();
+      return;
+    }
+    if (_selectedPrompt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a question above before you start speaking.')),
+      );
+      return;
+    }
+    await _audioService.startRecording();
+  }
+
+  Widget _buildQuestionOption(String question, {required bool locked}) {
+    final selected = question == _selectedPrompt;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: selected ? AppConstants.primaryLight.withValues(alpha: 0.08) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: locked ? null : () => setState(() => _selectedPrompt = question),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? AppConstants.primaryLight : Colors.grey.shade300,
+                width: selected ? 1.8 : 1,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  size: 20,
+                  color: selected ? AppConstants.primaryLight : AppConstants.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    question,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: AppConstants.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _handleSubmit() async {
@@ -72,7 +140,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
       final session = await _apiService.uploadAndAnalyzeAudio(
         audioPath: _audioService.recordedFilePath!,
-        prompt: _selectedPrompt,
+        prompt: _selectedPrompt!,
         durationSec: _audioService.recordingDuration.toDouble(),
         token: token,
       );
@@ -108,6 +176,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         final hasRecording = _audioService.hasRecording;
         final isPlaying = _audioService.isPlaying;
         final duration = _audioService.recordingDuration;
+        final locked = isRecording || hasRecording || _isSubmitting;
 
         return Scaffold(
           backgroundColor: AppConstants.backgroundColor,
@@ -123,57 +192,39 @@ class _PracticeScreenState extends State<PracticeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Speaking Prompt Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.blue.shade100, width: 1.5),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.psychology_outlined, color: AppConstants.primaryLight, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Speaking Prompt',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppConstants.primaryLight),
-                                ),
-                              ],
-                            ),
-                            if (!isRecording && !_isSubmitting)
-                              IconButton(
-                                icon: const Icon(Icons.shuffle, size: 18, color: AppConstants.textSecondary),
-                                tooltip: 'Next Prompt',
-                                onPressed: _cyclePrompt,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          _selectedPrompt,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: AppConstants.textPrimary,
-                            height: 1.4,
+                  // Question picker: choose 1 of 5 random questions; locked once recorded
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.psychology_outlined, color: AppConstants.primaryLight, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            locked ? 'Your Question' : 'Choose a Question',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.primaryLight),
                           ),
+                        ],
+                      ),
+                      if (!locked)
+                        TextButton.icon(
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('New questions'),
+                          onPressed: () => setState(_dealQuestions),
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Tip: Speak clearly for at least 15 to 30 seconds. Explain your thought process in complete sentences.',
-                          style: TextStyle(fontSize: 12, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 10),
+                  if (locked && _selectedPrompt != null)
+                    _buildQuestionOption(_selectedPrompt!, locked: true)
+                  else
+                    ..._questions.map((q) => _buildQuestionOption(q, locked: locked)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Tip: Speak clearly for at least 15 to 30 seconds, in complete sentences.',
+                    style: TextStyle(fontSize: 12, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
+                  ),
+                  const SizedBox(height: 28),
 
                   // Recording Visual Stage
                   Center(
@@ -181,15 +232,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       children: [
                         // Animated Pulse Circle
                         GestureDetector(
-                          onTap: _isSubmitting
-                              ? null
-                              : () async {
-                                  if (isRecording) {
-                                    await _audioService.stopRecording();
-                                  } else {
-                                    await _audioService.startRecording();
-                                  }
-                                },
+                          onTap: _isSubmitting ? null : () => _toggleRecording(isRecording),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
                             width: isRecording ? 130 : 110,
@@ -220,7 +263,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         Text(
                           isRecording
                               ? 'Recording... ${duration ~/ 60}:${(duration % 60).toString().padLeft(2, '0')}'
-                              : (hasRecording ? 'Recording Ready (${duration}s)' : 'Tap Microphone to Speak'),
+                              : (hasRecording
+                                  ? 'Recording Ready (${duration}s)'
+                                  : (_selectedPrompt == null ? 'Choose a question, then tap the mic' : 'Tap Microphone to Speak')),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

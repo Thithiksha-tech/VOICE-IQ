@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
+import '../../main.dart';
 import 'register_screen.dart';
-import 'admin_login_screen.dart';
-import '../student/student_dashboard_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,8 +16,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'student@voiceiq.edu');
-  final _passwordController = TextEditingController(text: 'Student@12345');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -36,11 +36,27 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text.trim(),
     );
 
+    // AuthWrapper opens the student or admin dashboard based on the account's role
     if (success && mounted) {
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const StudentDashboardScreen()),
+        MaterialPageRoute(builder: (_) => const AuthWrapper()),
+        (route) => false,
       );
+    }
+  }
+
+  Future<void> _openForgotPassword() async {
+    Provider.of<AuthService>(context, listen: false).clearError();
+    final email = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+      ),
+    );
+    if (email != null && mounted) {
+      _emailController.text = email;
+      _passwordController.clear();
     }
   }
 
@@ -125,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      labelText: 'Student Email',
+                      labelText: 'Email',
                       prefixIcon: const Icon(Icons.email_outlined),
                       filled: true,
                       fillColor: Colors.white,
@@ -152,11 +168,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (val) => val == null || val.isEmpty ? 'Please enter password' : null,
                   ),
-                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _openForgotPassword,
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(color: AppConstants.primaryLight, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
-                  // Login Button
+                  // Login Button (students and admins; routed by role after sign-in)
                   CustomButton(
-                    label: 'Sign In as Student',
+                    label: 'Sign In',
                     isLoading: auth.isLoading,
                     icon: Icons.login_rounded,
                     onPressed: _handleLogin,
@@ -188,25 +214,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Admin Portal Gateway
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    icon: const Icon(Icons.admin_panel_settings_outlined, color: AppConstants.textSecondary),
-                    label: const Text(
-                      'Faculty / Administrator Portal',
-                      style: TextStyle(color: AppConstants.textSecondary, fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: () {
-                      auth.clearError();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
-                      );
-                    },
                   ),
                 ],
               ),

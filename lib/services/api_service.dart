@@ -77,25 +77,40 @@ class ApiService {
     }
   }
 
-  Future<UserModel> adminLogin(String email, String password) async {
+  /// Emails a 6-digit reset code; returns the server's confirmation message.
+  Future<String> forgotPassword(String email) async {
+    return _postForMessage(
+      AppConstants.forgotPasswordEndpoint,
+      {'email': email.trim().toLowerCase()},
+      'Could not send the reset code. Please try again.',
+    );
+  }
+
+  /// Sets a new password using the emailed code.
+  Future<String> resetPassword(String email, String code, String newPassword) async {
+    return _postForMessage(
+      AppConstants.resetPasswordEndpoint,
+      {'email': email.trim().toLowerCase(), 'code': code.trim(), 'new_password': newPassword},
+      'Could not reset the password. Please try again.',
+    );
+  }
+
+  Future<String> _postForMessage(String url, Map<String, String> body, String fallbackError) async {
     try {
       final response = await _client.post(
-        Uri.parse(AppConstants.adminLoginEndpoint),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email.trim().toLowerCase(),
-          'password': password,
-        }),
+        body: jsonEncode(body),
       );
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return UserModel.fromJson(data);
-      } else {
-        throw Exception(data['detail'] ?? 'Admin authentication failed.');
+        return data['message'] as String;
       }
+      final detail = data['detail'];
+      throw Exception(detail is String ? detail : fallbackError);
     } on SocketException {
-      throw Exception('Cannot reach backend server. Verify ${AppConstants.apiBaseUrl}.');
+      throw Exception('Cannot reach the server. Please check your internet connection.');
     }
   }
 

@@ -8,12 +8,15 @@ class AuthService extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   UserModel? _currentUser;
   bool _isLoading = true;
+  bool _sessionChecked = false;
   String? _errorMessage;
 
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null && _currentUser!.token != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   bool get isLoading => _isLoading;
+  /// True only while the saved session is restored at app start.
+  bool get isInitializing => !_sessionChecked;
   String? get errorMessage => _errorMessage;
 
   AuthService() {
@@ -34,6 +37,7 @@ class AuthService extends ChangeNotifier {
       _currentUser = null;
     } finally {
       _isLoading = false;
+      _sessionChecked = true;
       notifyListeners();
     }
   }
@@ -78,25 +82,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> adminLogin(String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final user = await _apiService.adminLogin(email, password);
-      _currentUser = user;
-      await _persistSession(user);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
 
   Future<void> _persistSession(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
