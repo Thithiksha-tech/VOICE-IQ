@@ -25,13 +25,8 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      # Verification / reset emails. Preferred: Gmail Apps Script relay (EMAIL_SCRIPT_URL + secret)
+      # Verification / reset emails via the Gmail Apps Script relay (backend/email_relay.gs)
       - key: EMAIL_SCRIPT_URL
         sync: false
       - key: EMAIL_SCRIPT_SECRET
-        sync: false
-      # Fallback: Brevo (free): API key + a verified sender address
-      - key: BREVO_API_KEY
-        sync: false
-      - key: EMAIL_FROM
         sync: false
